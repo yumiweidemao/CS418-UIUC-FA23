@@ -1,0 +1,6 @@
+png 8 8 messy2.png
+color 4 127 255 255 127 170 170 255 255 200 120 3 255 0 0 0 191 255 255 255 255
+position 2 1 2 2 3 4 5 0 0 2 4
+drawPixels 5
+position 2 0 0 0 7 7 7 7 0 6 1
+drawPixels 5
