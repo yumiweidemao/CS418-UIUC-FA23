@@ -1,0 +1,9 @@
+png 120 120 alpha.png
+sRGB
+
+color 4  1 0 0 1              0 1 0 0          0 0 1 0.5        0 1 1 0.5      0 1 1 0.5        0 1 1 0.5
+position 4 -36.0 -50.0 0 60  50.0 -40.0 0 60  10.0 50.0 0 60  -22.0 0.0 0 60  32.0 -55.0 0 60  42.0 55.0 0 60
+elements 0 2 4  0 1 2  3 4 5
+drawElementsTriangles 3 0
+drawElementsTriangles 3 3
+drawElementsTriangles 3 6
