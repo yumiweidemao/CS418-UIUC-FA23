@@ -1,4 +1,5 @@
 import sys
+import re
 from keyword_handler import KeywordHandler
 
 # Global variables
@@ -18,6 +19,7 @@ def parse(filename):
     with open(filename) as file:
         for line in file:
             line = line.strip()
+            line = re.sub(' +', ' ', line)
             words = line.split(' ')
             keyword = words[0]
             args = words[1:]
