@@ -11,6 +11,13 @@ class KeywordHandler:
         self.__output_filename  = None
         self.__color_dim        = None
         self.__pos_dim          = None
+        self.__elements         = None
+        self.__depth_buf        = None
+
+        # mode switches
+        self.__depth_enabled    = False
+
+    ### Below are core functions ###
 
     def png_handler(self, *args):
         width, height, filename = int(args[0]), int(args[1]), args[2]
@@ -48,50 +55,67 @@ class KeywordHandler:
         count = int(args[1])
         points = []
         for i in range(count//3):
-            # create numpy arrays that have position, color, etc.
-            pos1 = self.__buf[first+i*3]
-            pos2 = self.__buf[first+i*3+1]
-            pos3 = self.__buf[first+i*3+2]
-            color1 = self.__colors[first+i*3]
-            color2 = self.__colors[first+i*3+1]
-            color3 = self.__colors[first+i*3+2]
+            p1, p2, p3 = self.__generate_points(first+i*3, first+i*3+1, first+i*3+2)
+            temp = self.__scanline(p1, p2, p3)
+            if temp is not None:
+                points.extend(temp)
+        self.__draw_points(points)
 
-            # array format: (x', y', r, g, b, a)
-            p1 = np.array([
-                (pos1[0]/pos1[3] + 1)*self.__width/2,
-                (pos1[1]/pos1[3] + 1)*self.__height/2,
-                color1[0],
-                color1[1],
-                color1[2],
-                color1[3]
-            ])
-            p2 = np.array([
-                (pos2[0]/pos2[3] + 1)*self.__width/2,
-                (pos2[1]/pos2[3] + 1)*self.__height/2,
-                color2[0],
-                color2[1],
-                color2[2],
-                color2[3]
-            ])
-            p3 = np.array([
-                (pos3[0]/pos3[3] + 1)*self.__width/2,
-                (pos3[1]/pos3[3] + 1)*self.__height/2,
-                color3[0],
-                color3[1],
-                color3[2],
-                color3[3]
-            ])
+    def save_image(self):
+        self.__img.save(self.__output_filename)
 
-            # run scanline algorithm
-            points.extend(self.__scanline(p1, p2, p3))
-        
-        # draw the points
+    ### Below are elective functions ###
+    
+    def elements_handler(self, *args):
+        self.__elements = [int(arg) for arg in args]
+
+    def drawElementsTriangles_handler(self, *args):
+        count = int(args[0])
+        offset = int(args[1])
+        points = []
+        for i in range(count//3):
+            p1, p2, p3 = self.__generate_points(self.__elements[offset+i*3],
+                                                self.__elements[offset+i*3+1],
+                                                self.__elements[offset+i*3+2])
+            temp = self.__scanline(p1, p2, p3)
+            if temp is not None:
+                points.extend(temp)
+        self.__draw_points(points)
+
+    def depth_handler(self, *args):
+        self.__depth_enabled = True
+        # TODO: initialize depth buffer
+
+    ### Below are private helper functions ###
+
+    def __generate_points(self, *indices):
+        """
+            Generate points (numpy arrays) from given indices.
+            Note that the first two attributes must be x & y for __scanline() to work.
+            Changes made in this function should also be reflected in __draw_points().
+        """
+        points = []
+        for idx in indices:
+            pos = self.__buf[idx]
+            color = self.__colors[idx]
+            point = np.array([
+                (pos[0]/pos[3] + 1)*self.__width/2,
+                (pos[1]/pos[3] + 1)*self.__height/2,
+                color[0],
+                color[1],
+                color[2],
+                color[3]
+            ])
+            points.append(point)
+        return points
+    
+    def __draw_points(self, points):
         for point in points:
             x, y = int(point[0]), int(point[1])
             r, g, b, a = int(point[2]*255), int(point[3]*255), int(point[4]*255), int(point[5]*255)
             if x < self.__width and y < self.__height:
                 self.__img.putpixel((x, y), (r, g, b, a))
-    
+
     def __scanline(self, pp, q, r):
         """
             @params pp, q, r: numpy vectors representing 3 points
@@ -161,6 +185,4 @@ class KeywordHandler:
             ret.append(np.copy(p))
             p += s
         return ret
-
-    def save_image(self):
-        self.__img.save(self.__output_filename)
+    

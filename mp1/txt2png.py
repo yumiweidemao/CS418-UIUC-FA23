@@ -5,10 +5,13 @@ from keyword_handler import KeywordHandler
 # Global variables
 kw_handler = KeywordHandler()
 keyword_func_list = {
-    "png"       : kw_handler.png_handler,
-    "position"  : kw_handler.position_handler,
-    "color"     : kw_handler.color_handler,
-    "drawArraysTriangles": kw_handler.drawArraysTriangles_handler
+    "png"                   : kw_handler.png_handler,
+    "position"              : kw_handler.position_handler,
+    "color"                 : kw_handler.color_handler,
+    "drawArraysTriangles"   : kw_handler.drawArraysTriangles_handler,
+    "elements"              : kw_handler.elements_handler,
+    "drawElementsTriangles" : kw_handler.drawElementsTriangles_handler,
+    "depth"                 : kw_handler.depth_handler 
 }
 
 # Functions
