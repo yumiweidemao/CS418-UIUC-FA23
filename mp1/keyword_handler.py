@@ -16,6 +16,7 @@ class KeywordHandler:
 
         # mode switches
         self.__depth_enabled    = False
+        self.__sRGB_enabled     = False
 
     ### Below are core functions ###
 
@@ -84,7 +85,10 @@ class KeywordHandler:
 
     def depth_handler(self, *args):
         self.__depth_enabled = True
-        # TODO: initialize depth buffer
+        self.__depth_buf = [[float('inf') for _ in range(self.__width)] for _ in range(self.__height)]
+
+    def sRGB_handler(self, *args):
+        self.__sRGB_enabled = True
 
     ### Below are private helper functions ###
 
@@ -101,6 +105,8 @@ class KeywordHandler:
             point = np.array([
                 (pos[0]/pos[3] + 1)*self.__width/2,
                 (pos[1]/pos[3] + 1)*self.__height/2,
+                pos[2],
+                pos[3],
                 color[0],
                 color[1],
                 color[2],
@@ -112,9 +118,21 @@ class KeywordHandler:
     def __draw_points(self, points):
         for point in points:
             x, y = int(point[0]), int(point[1])
-            r, g, b, a = int(point[2]*255), int(point[3]*255), int(point[4]*255), int(point[5]*255)
+            if self.__sRGB_enabled:
+                r, g, b, a = int(self.__sRGB_gamma(point[4])*255),\
+                             int(self.__sRGB_gamma(point[5])*255),\
+                             int(self.__sRGB_gamma(point[6])*255),\
+                             int(point[7]*255)
+            else:
+                r, g, b, a = int(point[4]*255), int(point[5]*255),\
+                             int(point[6]*255), int(point[7]*255)
             if x < self.__width and y < self.__height:
-                self.__img.putpixel((x, y), (r, g, b, a))
+                if self.__depth_enabled:
+                    if point[2] < self.__depth_buf[y][x]:
+                        self.__depth_buf[y][x] = point[2]
+                        self.__img.putpixel((x, y), (r, g, b, a))
+                else:
+                    self.__img.putpixel((x, y), (r, g, b, a))
 
     def __scanline(self, pp, q, r):
         """
@@ -185,4 +203,10 @@ class KeywordHandler:
             ret.append(np.copy(p))
             p += s
         return ret
+    
+    def __sRGB_gamma(self, l_display):
+        if l_display <= 0.0031308:
+            return l_display*12.92
+        else:
+            return 1.055*(l_display)**(1/2.4) - 0.055
     
