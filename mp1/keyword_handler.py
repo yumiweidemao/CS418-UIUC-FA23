@@ -13,10 +13,10 @@ class KeywordHandler:
         self.__pos_dim          = None
         self.__elements         = None
         self.__depth_buf        = None
+        self.__gamma            = self.__linear_gamma
 
         # mode switches
         self.__depth_enabled    = False
-        self.__sRGB_enabled     = False
 
     ### Below are core functions ###
 
@@ -88,7 +88,7 @@ class KeywordHandler:
         self.__depth_buf = [[float('inf') for _ in range(self.__width)] for _ in range(self.__height)]
 
     def sRGB_handler(self, *args):
-        self.__sRGB_enabled = True
+        self.__gamma = self.__sRGB_gamma
 
     ### Below are private helper functions ###
 
@@ -102,6 +102,7 @@ class KeywordHandler:
         for idx in indices:
             pos = self.__buf[idx]
             color = self.__colors[idx]
+            # current point format: (x', y', z, w, r, g, b, a)
             point = np.array([
                 (pos[0]/pos[3] + 1)*self.__width/2,
                 (pos[1]/pos[3] + 1)*self.__height/2,
@@ -118,14 +119,10 @@ class KeywordHandler:
     def __draw_points(self, points):
         for point in points:
             x, y = int(point[0]), int(point[1])
-            if self.__sRGB_enabled:
-                r, g, b, a = int(self.__sRGB_gamma(point[4])*255),\
-                             int(self.__sRGB_gamma(point[5])*255),\
-                             int(self.__sRGB_gamma(point[6])*255),\
-                             int(point[7]*255)
-            else:
-                r, g, b, a = int(point[4]*255), int(point[5]*255),\
-                             int(point[6]*255), int(point[7]*255)
+            r, g, b, a = int(self.__gamma(point[4])*255),\
+                         int(self.__gamma(point[5])*255),\
+                         int(self.__gamma(point[6])*255),\
+                         int(point[7]*255)
             if x < self.__width and y < self.__height:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
@@ -203,6 +200,9 @@ class KeywordHandler:
             ret.append(np.copy(p))
             p += s
         return ret
+    
+    def __linear_gamma(self, l_display):
+        return l_display
     
     def __sRGB_gamma(self, l_display):
         if l_display <= 0.0031308:
