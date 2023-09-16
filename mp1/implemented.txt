@@ -3,11 +3,12 @@ depth
 gamma
 hyperbolic
 alpha
+matrix
 
 #cull
 #anti-alias
-#matrix
 #position23
 #textures
 #points
 #decal
+#frustum

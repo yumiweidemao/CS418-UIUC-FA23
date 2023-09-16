@@ -13,12 +13,15 @@ class KeywordHandler:
         self.__pos_dim          = None
         self.__elements         = None
         self.__depth_buf        = None
-        self.__gamma            = self.__linear_gamma
+        self.__uniform_matrix   = None
 
         # mode switches
         self.__depth_enabled    = False
         self.__hyp_enabled      = False
         self.__alpha_enabled    = False
+
+        # use linear gamma by default
+        self.__gamma            = self.__linear_gamma
 
     ### Below are core functions ###
 
@@ -97,6 +100,15 @@ class KeywordHandler:
     def hyp_handler(self, *args):
         self.__hyp_enabled = True
 
+    def uniformMatrix_handler(self, *args):
+        self.__uniform_matrix = np.array([
+            [float(args[0]), float(args[4]), float(args[8]), float(args[12])],
+            [float(args[1]), float(args[5]), float(args[9]), float(args[13])],
+            [float(args[2]), float(args[6]), float(args[10]), float(args[14])],
+            [float(args[3]), float(args[7]), float(args[11]), float(args[15])]
+        ])
+        
+
     ### Below are private helper functions ###
 
     def __generate_points(self, *indices):
@@ -108,6 +120,8 @@ class KeywordHandler:
         points = []
         for idx in indices:
             pos = self.__buf[idx]
+            if self.__uniform_matrix is not None:
+                pos = np.matmul(self.__uniform_matrix, np.array(pos))
             color = self.__colors[idx]
             # current point format: (x', y', z, w, r, g, b, a)
             if not self.__hyp_enabled:
