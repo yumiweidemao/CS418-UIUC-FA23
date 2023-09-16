@@ -2,11 +2,10 @@ elements
 depth
 gamma
 hyperbolic
+alpha
 
-#frustum
 #cull
 #anti-alias
-#alpha
 #matrix
 #position23
 #textures

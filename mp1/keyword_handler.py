@@ -18,6 +18,7 @@ class KeywordHandler:
         # mode switches
         self.__depth_enabled    = False
         self.__hyp_enabled      = False
+        self.__alpha_enabled    = False
 
     ### Below are core functions ###
 
@@ -43,6 +44,8 @@ class KeywordHandler:
 
     def color_handler(self, *args):
         self.__color_dim = int(args[0])
+        if self.__color_dim == 4:
+            self.__alpha_enabled = True
         self.__colors = []
         for i in range(int(len(args[1:]) / self.__color_dim)):
             curr_color = []
@@ -139,6 +142,13 @@ class KeywordHandler:
                          int(self.__gamma(point[5]/point[3])*255),\
                          int(self.__gamma(point[6]/point[3])*255),\
                          int(point[7]/point[3]*255)
+            if self.__alpha_enabled:
+                r_old, g_old, b_old, a_old = self.__img.getpixel((x, y))
+                a_prime = a + a_old*(1-a/255)
+                r = int(a/a_prime * r + (1-a/255)*a_old/a_prime * r_old)
+                g = int(a/a_prime * g + (1-a/255)*a_old/a_prime * g_old)
+                b = int(a/a_prime * b + (1-a/255)*a_old/a_prime * b_old)
+                a = int(a_prime)
             if x < self.__width and y < self.__height:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
