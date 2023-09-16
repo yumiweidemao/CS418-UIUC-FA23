@@ -4,10 +4,10 @@ gamma
 hyperbolic
 alpha
 matrix
+position23
 
 #cull
 #anti-alias
-#position23
 #textures
 #points
 #decal
