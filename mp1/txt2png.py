@@ -14,7 +14,8 @@ keyword_func_list = {
     "depth"                 : kw_handler.depth_handler,
     "sRGB"                  : kw_handler.sRGB_handler,
     "hyp"                   : kw_handler.hyp_handler,
-    "uniformMatrix"         : kw_handler.uniformMatrix_handler
+    "uniformMatrix"         : kw_handler.uniformMatrix_handler,
+    "cull"                  : kw_handler.cull_handler
 }
 
 # Functions

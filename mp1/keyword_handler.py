@@ -19,6 +19,7 @@ class KeywordHandler:
         self.__depth_enabled    = False
         self.__hyp_enabled      = False
         self.__alpha_enabled    = False
+        self.__cull_enabled     = False
 
         # use linear gamma by default
         self.__gamma            = self.__linear_gamma
@@ -64,6 +65,8 @@ class KeywordHandler:
         points = []
         for i in range(count//3):
             p1, p2, p3 = self.__generate_points(first+i*3, first+i*3+1, first+i*3+2)
+            if self.__cull_enabled and self.__is_clockwise(p1, p2, p3):
+                continue
             temp = self.__scanline(p1, p2, p3)
             if temp is not None:
                 points.extend(temp)
@@ -85,6 +88,8 @@ class KeywordHandler:
             p1, p2, p3 = self.__generate_points(self.__elements[offset+i*3],
                                                 self.__elements[offset+i*3+1],
                                                 self.__elements[offset+i*3+2])
+            if self.__cull_enabled and self.__is_clockwise(p1, p2, p3):
+                continue
             temp = self.__scanline(p1, p2, p3)
             if temp is not None:
                 points.extend(temp)
@@ -107,7 +112,9 @@ class KeywordHandler:
             [float(args[2]), float(args[6]), float(args[10]), float(args[14])],
             [float(args[3]), float(args[7]), float(args[11]), float(args[15])]
         ])
-        
+    
+    def cull_handler(self, *args):
+        self.__cull_enabled = True
 
     ### Below are private helper functions ###
 
@@ -240,6 +247,21 @@ class KeywordHandler:
             ret.append(np.copy(p))
             p += s
         return ret
+    
+    def __is_clockwise(self, p1, p2, p3):
+        # Given three points p where (p[0], p[1]) = (x, y),
+        # return true if p1->p2->p3->p1 is clockwise.
+        p1 = np.array([p1[0], p1[1]])
+        p2 = np.array([p2[0], p2[1]])
+        p3 = np.array([p3[0], p3[1]])
+
+        # use cross-product to find path direction
+        v1 = p2 - p1
+        v2 = p3 - p2
+        z = v1[0] * v2[1] - v1[1] * v2[0]
+        if z > 0:
+            return True
+        return False
     
     def __linear_gamma(self, l_display):
         return l_display
