@@ -12,7 +12,8 @@ keyword_func_list = {
     "elements"              : kw_handler.elements_handler,
     "drawElementsTriangles" : kw_handler.drawElementsTriangles_handler,
     "depth"                 : kw_handler.depth_handler,
-    "sRGB"                  : kw_handler.sRGB_handler
+    "sRGB"                  : kw_handler.sRGB_handler,
+    "hyp"                   : kw_handler.hyp_handler
 }
 
 # Functions
