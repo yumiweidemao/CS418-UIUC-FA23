@@ -1,13 +1,4 @@
 elements
 depth
 gamma
-#hyperbolic
-#frustum
-#cull
-#anti-alias
-#alpha
-#matrix
-#position23
-#textures
-#points
-#decal
+hyperbolic
