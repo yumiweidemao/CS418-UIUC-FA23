@@ -14,6 +14,8 @@ class KeywordHandler:
         self.__elements         = None
         self.__depth_buf        = None
         self.__uniform_matrix   = None
+        self.__fsaa_level       = None
+        self.__fsaa_buf         = None
 
         # mode switches
         self.__depth_enabled    = False
@@ -97,7 +99,9 @@ class KeywordHandler:
 
     def depth_handler(self, *args):
         self.__depth_enabled = True
-        self.__depth_buf = [[float('inf') for _ in range(self.__width)] for _ in range(self.__height)]
+        if self.__depth_buf is None:
+            self.__depth_buf = [[float('inf') for _ in range(self.__width)]\
+                                 for _ in range(self.__height)]
 
     def sRGB_handler(self, *args):
         self.__gamma = self.__sRGB_gamma
@@ -116,6 +120,13 @@ class KeywordHandler:
     def cull_handler(self, *args):
         self.__cull_enabled = True
 
+    def fsaa_handler(self, *args):
+        self.__fsaa_level = int(args[0])
+        self.__fsaa_buf = [[np.array([0,0,0,0]) for _ in range(self.__fsaa_level*self.__width)]\
+                            for _ in range(self.__fsaa_level*self.__height)]
+        self.__depth_buf = [[float('inf') for _ in range(self.__fsaa_level*self.__width)]\
+                             for _ in range(self.__fsaa_level*self.__height)]
+
     ### Below are private helper functions ###
 
     def __generate_points(self, *indices):
@@ -125,6 +136,7 @@ class KeywordHandler:
             Changes made in this function should also be reflected in __draw_points().
         """
         points = []
+        fsaa_level = 1 if self.__fsaa_level is None else self.__fsaa_level
         for idx in indices:
             pos = self.__buf[idx]
             if self.__uniform_matrix is not None:
@@ -133,8 +145,8 @@ class KeywordHandler:
             # current point format: (x', y', z, w, r, g, b, a)
             if not self.__hyp_enabled:
                 point = np.array([
-                    (pos[0]/pos[3] + 1)*self.__width/2,
-                    (pos[1]/pos[3] + 1)*self.__height/2,
+                    (pos[0]/pos[3] + 1)*self.__width*fsaa_level/2,
+                    (pos[1]/pos[3] + 1)*self.__height*fsaa_level/2,
                     pos[2],
                     1,
                     color[0],
@@ -144,8 +156,8 @@ class KeywordHandler:
                 ])
             else:
                 point = np.array([
-                    (pos[0]/pos[3] + 1)*self.__width/2,
-                    (pos[1]/pos[3] + 1)*self.__height/2,
+                    (pos[0]/pos[3] + 1)*self.__width*fsaa_level/2,
+                    (pos[1]/pos[3] + 1)*self.__height*fsaa_level/2,
                     pos[2]/pos[3],
                     1/pos[3],
                     color[0]/pos[3],
@@ -157,6 +169,7 @@ class KeywordHandler:
         return points
     
     def __draw_points(self, points):
+        fsaa_level = 1 if self.__fsaa_level is None else self.__fsaa_level
         for point in points:
             x, y = int(point[0]), int(point[1])
             r, g, b, a = int(self.__gamma(point[4]/point[3])*255),\
@@ -170,12 +183,29 @@ class KeywordHandler:
                 g = int(a/a_prime * g + (1-a/255)*a_old/a_prime * g_old)
                 b = int(a/a_prime * b + (1-a/255)*a_old/a_prime * b_old)
                 a = int(a_prime)
-            if x < self.__width and y < self.__height:
+            if x < self.__width*fsaa_level and y < self.__height*fsaa_level:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
                         self.__depth_buf[y][x] = point[2]
-                        self.__img.putpixel((x, y), (r, g, b, a))
+                        if self.__fsaa_level is None:
+                            self.__img.putpixel((x, y), (r, g, b, a))
+                        else:
+                            self.__fsaa_buf[y][x] = np.array((r, g, b, a))
                 else:
+                    if self.__fsaa_level is None:
+                        self.__img.putpixel((x, y), (r, g, b, a))
+                    else:
+                        self.__fsaa_buf[y][x] = np.array((r, g, b, a))
+        
+        if self.__fsaa_level is not None:
+            for y in range(self.__height):
+                for x in range(self.__width):
+                    rgba = np.zeros(4)
+                    for i in range(self.__fsaa_level):
+                        for j in range(self.__fsaa_level):
+                            rgba += self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j]
+                    rgba /= self.__fsaa_level**2
+                    r, g, b, a = int(rgba[0]), int(rgba[1]), int(rgba[2]), int(rgba[3])
                     self.__img.putpixel((x, y), (r, g, b, a))
 
     def __scanline(self, pp, q, r):
@@ -271,4 +301,3 @@ class KeywordHandler:
             return l_display*12.92
         else:
             return 1.055*(l_display)**(1/2.4) - 0.055
-    

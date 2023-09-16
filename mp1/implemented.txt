@@ -6,8 +6,8 @@ alpha
 matrix
 position23
 cull
+anti-alias
 
-#anti-alias
 #textures
 #points
 #decal

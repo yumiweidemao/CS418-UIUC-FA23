@@ -15,7 +15,8 @@ keyword_func_list = {
     "sRGB"                  : kw_handler.sRGB_handler,
     "hyp"                   : kw_handler.hyp_handler,
     "uniformMatrix"         : kw_handler.uniformMatrix_handler,
-    "cull"                  : kw_handler.cull_handler
+    "cull"                  : kw_handler.cull_handler,
+    "fsaa"                  : kw_handler.fsaa_handler
 }
 
 # Functions
