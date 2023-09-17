@@ -9,7 +9,3 @@ cull
 anti-alias
 textures
 decal
-
-# following are not implemented
-#points
-#frustum
