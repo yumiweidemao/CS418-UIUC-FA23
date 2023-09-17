@@ -16,12 +16,15 @@ class KeywordHandler:
         self.__uniform_matrix   = None
         self.__fsaa_level       = None
         self.__fsaa_buf         = None
+        self.__texcoord_buf     = None
+        self.__tex_img          = None
 
         # mode switches
         self.__depth_enabled    = False
         self.__hyp_enabled      = False
         self.__alpha_enabled    = False
         self.__cull_enabled     = False
+        self.__texture_enabled  = False
 
         # use linear gamma by default
         self.__gamma            = self.__linear_gamma
@@ -126,6 +129,17 @@ class KeywordHandler:
                             for _ in range(self.__fsaa_level*self.__height)]
         self.__depth_buf = [[float('inf') for _ in range(self.__fsaa_level*self.__width)]\
                              for _ in range(self.__fsaa_level*self.__height)]
+        
+    def texture_handler(self, *args):
+        tex_filename = args[0]
+        self.__texture_enabled = True
+        self.__texcoord_buf = []
+        self.__tex_img = Image.open(tex_filename)
+
+    def texcoord_handler(self, *args):
+        for i in range((len(args)-1)//2):
+            coord = (float(args[1+i*2]), float(args[1+i*2+1]))
+            self.__texcoord_buf.append(coord)
 
     ### Below are private helper functions ###
 
@@ -141,8 +155,9 @@ class KeywordHandler:
             pos = self.__buf[idx]
             if self.__uniform_matrix is not None:
                 pos = np.matmul(self.__uniform_matrix, np.array(pos))
-            color = self.__colors[idx]
-            # current point format: (x', y', z, w, r, g, b, a)
+            color = self.__colors[idx] if self.__colors else (0, 0, 0, 0)
+            s, t = self.__texcoord_buf[idx] if self.__texture_enabled else (0, 0)
+            # current point format: (x', y', z, w, r, g, b, a, s, t)
             if not self.__hyp_enabled:
                 point = np.array([
                     (pos[0]/pos[3] + 1)*self.__width*fsaa_level/2,
@@ -152,7 +167,9 @@ class KeywordHandler:
                     color[0],
                     color[1],
                     color[2],
-                    color[3]
+                    color[3],
+                    s,
+                    t
                 ])
             else:
                 point = np.array([
@@ -163,7 +180,9 @@ class KeywordHandler:
                     color[0]/pos[3],
                     color[1]/pos[3],
                     color[2]/pos[3],
-                    color[3]/pos[3]
+                    color[3]/pos[3],
+                    s/pos[3],
+                    t/pos[3]
                 ])
             points.append(point)
         return points
@@ -183,6 +202,15 @@ class KeywordHandler:
                 g = int(a/a_prime * g + (1-a/255)*a_old/a_prime * g_old)
                 b = int(a/a_prime * b + (1-a/255)*a_old/a_prime * b_old)
                 a = int(a_prime)
+            if self.__texture_enabled:
+                s = int((point[8]/point[3])%1.0*self.__tex_img.width)
+                t = int((point[9]/point[3])%1.0*self.__tex_img.height)
+                texel = self.__tex_img.getpixel((s, t))
+                if len(texel) == 3:
+                    r, g, b = texel
+                    a = 255
+                else:
+                    r, g, b, a = texel
             if x < self.__width*fsaa_level and y < self.__height*fsaa_level:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
