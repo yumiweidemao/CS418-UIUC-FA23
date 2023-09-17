@@ -234,11 +234,20 @@ class KeywordHandler:
                 r, g, b, a = r_t, g_t, b_t, a_t
             if self.__alpha_enabled:
                 r_old, g_old, b_old, a_old = self.__img.getpixel((x, y))
+                r_old = self.__sRGB_to_linear(r_old/255) * 255
+                g_old = self.__sRGB_to_linear(g_old/255) * 255
+                b_old = self.__sRGB_to_linear(b_old/255) * 255
+                r = self.__sRGB_to_linear(r/255) * 255
+                g = self.__sRGB_to_linear(g/255) * 255
+                b = self.__sRGB_to_linear(b/255) * 255
                 a_prime = a + a_old*(1-a/255)
-                r = int(a/a_prime * r + (1-a/255)*a_old/a_prime * r_old)
-                g = int(a/a_prime * g + (1-a/255)*a_old/a_prime * g_old)
-                b = int(a/a_prime * b + (1-a/255)*a_old/a_prime * b_old)
+                r = a/a_prime * r + (1-a/255)*a_old/a_prime * r_old
+                g = a/a_prime * g + (1-a/255)*a_old/a_prime * g_old
+                b = a/a_prime * b + (1-a/255)*a_old/a_prime * b_old
                 a = int(a_prime)
+                r = int(self.__sRGB_gamma(r/255) * 255)
+                g = int(self.__sRGB_gamma(g/255) * 255)
+                b = int(self.__sRGB_gamma(b/255) * 255)
             if x < self.__width*fsaa_level and y < self.__height*fsaa_level:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
@@ -259,9 +268,26 @@ class KeywordHandler:
                     rgba = np.zeros(4)
                     for i in range(self.__fsaa_level):
                         for j in range(self.__fsaa_level):
-                            rgba += self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j]
-                    rgba /= self.__fsaa_level**2
-                    r, g, b, a = int(rgba[0]), int(rgba[1]), int(rgba[2]), int(rgba[3])
+                            step = np.array([
+                                self.__sRGB_to_linear(self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][0]/255),
+                                self.__sRGB_to_linear(self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][1]/255),
+                                self.__sRGB_to_linear(self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][2]/255),
+                                self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][3]/255
+                            ])
+                            step[0] *= step[3]
+                            step[1] *= step[3]
+                            step[2] *= step[3]
+                            rgba += step
+                    if rgba[3] == 0.0:
+                        continue
+                    rgba[0] /= rgba[3]
+                    rgba[1] /= rgba[3]
+                    rgba[2] /= rgba[3]
+                    rgba[3] /= self.__fsaa_level**2
+                    r = round(self.__sRGB_gamma(rgba[0]) * 255)
+                    g = round(self.__sRGB_gamma(rgba[1]) * 255)
+                    b = round(self.__sRGB_gamma(rgba[2]) * 255)
+                    a = round(rgba[3] * 255)
                     self.__img.putpixel((x, y), (r, g, b, a))
 
     def __scanline(self, pp, q, r):
