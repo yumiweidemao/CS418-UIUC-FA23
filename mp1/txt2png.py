@@ -18,7 +18,8 @@ keyword_func_list = {
     "cull"                  : kw_handler.cull_handler,
     "fsaa"                  : kw_handler.fsaa_handler,
     "texture"               : kw_handler.texture_handler,
-    "texcoord"              : kw_handler.texcoord_handler
+    "texcoord"              : kw_handler.texcoord_handler,
+    "decals"                : kw_handler.decals_handler
 }
 
 # Functions

@@ -25,6 +25,7 @@ class KeywordHandler:
         self.__alpha_enabled    = False
         self.__cull_enabled     = False
         self.__texture_enabled  = False
+        self.__decals_enabled   = False
 
         # use linear gamma by default
         self.__gamma            = self.__linear_gamma
@@ -133,13 +134,16 @@ class KeywordHandler:
     def texture_handler(self, *args):
         tex_filename = args[0]
         self.__texture_enabled = True
-        self.__texcoord_buf = []
         self.__tex_img = Image.open(tex_filename)
 
     def texcoord_handler(self, *args):
+        self.__texcoord_buf = []
         for i in range((len(args)-1)//2):
             coord = (float(args[1+i*2]), float(args[1+i*2+1]))
             self.__texcoord_buf.append(coord)
+
+    def decals_handler(self, *args):
+        self.__decals_enabled = True
 
     ### Below are private helper functions ###
 
@@ -195,6 +199,22 @@ class KeywordHandler:
                          int(self.__gamma(point[5]/point[3])*255),\
                          int(self.__gamma(point[6]/point[3])*255),\
                          int(point[7]/point[3]*255)
+            if self.__texture_enabled:
+                s = int((point[8]/point[3])%1.0*self.__tex_img.width)
+                t = int((point[9]/point[3])%1.0*self.__tex_img.height)
+                texel = self.__tex_img.getpixel((s, t))
+                if len(texel) == 3:
+                    r_t, g_t, b_t = texel
+                    a_t = 255
+                else:
+                    r_t, g_t, b_t, a_t = texel
+                if self.__decals_enabled:
+                    a_prime = a_t + a*(1-a_t/255)
+                    r_t = int(a_t/a_prime * r_t + (1-a_t/255)*a/a_prime * r)
+                    g_t = int(a_t/a_prime * g_t + (1-a_t/255)*a/a_prime * g)
+                    b_t = int(a_t/a_prime * b_t + (1-a_t/255)*a/a_prime * b)
+                    a_t = int(a_prime)
+                r, g, b, a = r_t, g_t, b_t, a_t
             if self.__alpha_enabled:
                 r_old, g_old, b_old, a_old = self.__img.getpixel((x, y))
                 a_prime = a + a_old*(1-a/255)
@@ -202,15 +222,6 @@ class KeywordHandler:
                 g = int(a/a_prime * g + (1-a/255)*a_old/a_prime * g_old)
                 b = int(a/a_prime * b + (1-a/255)*a_old/a_prime * b_old)
                 a = int(a_prime)
-            if self.__texture_enabled:
-                s = int((point[8]/point[3])%1.0*self.__tex_img.width)
-                t = int((point[9]/point[3])%1.0*self.__tex_img.height)
-                texel = self.__tex_img.getpixel((s, t))
-                if len(texel) == 3:
-                    r, g, b = texel
-                    a = 255
-                else:
-                    r, g, b, a = texel
             if x < self.__width*fsaa_level and y < self.__height*fsaa_level:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
