@@ -209,11 +209,28 @@ class KeywordHandler:
                 else:
                     r_t, g_t, b_t, a_t = texel
                 if self.__decals_enabled:
+                    # use linear space pixel color
+                    r, g, b, a = int(point[4]/point[3]*255),\
+                         int(point[5]/point[3]*255),\
+                         int(point[6]/point[3]*255),\
+                         int(point[7]/point[3]*255)
+                    
+                    # convert texel color to linear space
+                    r_t = self.__sRGB_to_linear(r_t/255) * 255
+                    g_t = self.__sRGB_to_linear(g_t/255) * 255
+                    b_t = self.__sRGB_to_linear(b_t/255) * 255
+
+                    # blend in linear space
                     a_prime = a_t + a*(1-a_t/255)
-                    r_t = int(a_t/a_prime * r_t + (1-a_t/255)*a/a_prime * r)
-                    g_t = int(a_t/a_prime * g_t + (1-a_t/255)*a/a_prime * g)
-                    b_t = int(a_t/a_prime * b_t + (1-a_t/255)*a/a_prime * b)
+                    r_t = a_t/a_prime * r_t + (1-a_t/255)*a/a_prime * r
+                    g_t = a_t/a_prime * g_t + (1-a_t/255)*a/a_prime * g
+                    b_t = a_t/a_prime * b_t + (1-a_t/255)*a/a_prime * b
                     a_t = int(a_prime)
+
+                    # convert to sRGB
+                    r_t = int(self.__sRGB_gamma(r_t/255) * 255)
+                    g_t = int(self.__sRGB_gamma(g_t/255) * 255)
+                    b_t = int(self.__sRGB_gamma(b_t/255) * 255)
                 r, g, b, a = r_t, g_t, b_t, a_t
             if self.__alpha_enabled:
                 r_old, g_old, b_old, a_old = self.__img.getpixel((x, y))
@@ -340,3 +357,9 @@ class KeywordHandler:
             return l_display*12.92
         else:
             return 1.055*(l_display)**(1/2.4) - 0.055
+        
+    def __sRGB_to_linear(self, l_storage):
+        if l_storage <= 0.04045:
+            return l_storage/12.92
+        else:
+            return ((l_storage+0.055)/1.055)**2.4

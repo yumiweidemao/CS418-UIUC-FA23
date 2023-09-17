@@ -8,7 +8,8 @@ position23
 cull
 anti-alias
 textures
+decal
 
+# following are not implemented
 #points
-#decal
 #frustum
