@@ -79,13 +79,37 @@ function setupGeometry(geom) {
  * @param {number} milliseconds The elapsed time in milliseconds.
  */
 function draw(milliseconds) {
-    gl.clear(gl.COLOR_BUFFER_BIT) 
-    gl.useProgram(program)
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(program);
     
-    gl.uniform1f(program.uniforms.seconds, milliseconds/1000)
+    let t = milliseconds / 1000.0;
+
+    // Zoom
+    let scaledCos = 1.0 - (0.5 * Math.cos(t * 2.5) + 0.5) * (0.5 * Math.cos(t * 2.5) + 0.5);
+    let zoomFactor = 0.7*(0.3 * scaledCos + 0.4);
     
-    gl.bindVertexArray(geom.vao)
-    gl.drawElements(geom.mode, geom.count, geom.type, 0)
+    let scaleMatrix = glMatrix.mat4.create();
+    glMatrix.mat4.scale(scaleMatrix, scaleMatrix, [zoomFactor, zoomFactor, 1.0]);
+
+    // Rotate
+    let rotationMatrix = glMatrix.mat4.create();
+    glMatrix.mat4.rotate(rotationMatrix, rotationMatrix, 0.5 * t, [0, 0, 1]);
+
+    // Translate
+    let translationMatrix = glMatrix.mat4.create();
+    let translation = [0.3 * Math.sin(1.2 * t), 0.3 * Math.cos(1.2 * t), 0];
+    glMatrix.mat4.translate(translationMatrix, translationMatrix, translation);
+
+    // Combine transformations
+    let uniMat = glMatrix.mat4.create();
+    glMatrix.mat4.multiply(uniMat, translationMatrix, rotationMatrix);
+    glMatrix.mat4.multiply(uniMat, uniMat, scaleMatrix);
+
+    // Pass the transformation matrix to the vertex shader
+    gl.uniformMatrix4fv(program.uniforms.uniMat, false, uniMat);
+
+    gl.bindVertexArray(geom.vao);
+    gl.drawElements(geom.mode, geom.count, geom.type, 0);
 }
 
 /**
