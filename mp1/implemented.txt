@@ -7,8 +7,5 @@ matrix
 position23
 cull
 anti-alias
-
-#textures
-#points
-#decal
-#frustum
+textures
+decal

@@ -16,12 +16,16 @@ class KeywordHandler:
         self.__uniform_matrix   = None
         self.__fsaa_level       = None
         self.__fsaa_buf         = None
+        self.__texcoord_buf     = None
+        self.__tex_img          = None
 
         # mode switches
         self.__depth_enabled    = False
         self.__hyp_enabled      = False
         self.__alpha_enabled    = False
         self.__cull_enabled     = False
+        self.__texture_enabled  = False
+        self.__decals_enabled   = False
 
         # use linear gamma by default
         self.__gamma            = self.__linear_gamma
@@ -126,6 +130,20 @@ class KeywordHandler:
                             for _ in range(self.__fsaa_level*self.__height)]
         self.__depth_buf = [[float('inf') for _ in range(self.__fsaa_level*self.__width)]\
                              for _ in range(self.__fsaa_level*self.__height)]
+        
+    def texture_handler(self, *args):
+        tex_filename = args[0]
+        self.__texture_enabled = True
+        self.__tex_img = Image.open(tex_filename)
+
+    def texcoord_handler(self, *args):
+        self.__texcoord_buf = []
+        for i in range((len(args)-1)//2):
+            coord = (float(args[1+i*2]), float(args[1+i*2+1]))
+            self.__texcoord_buf.append(coord)
+
+    def decals_handler(self, *args):
+        self.__decals_enabled = True
 
     ### Below are private helper functions ###
 
@@ -141,8 +159,9 @@ class KeywordHandler:
             pos = self.__buf[idx]
             if self.__uniform_matrix is not None:
                 pos = np.matmul(self.__uniform_matrix, np.array(pos))
-            color = self.__colors[idx]
-            # current point format: (x', y', z, w, r, g, b, a)
+            color = self.__colors[idx] if self.__colors else (0, 0, 0, 0)
+            s, t = self.__texcoord_buf[idx] if self.__texture_enabled else (0, 0)
+            # current point format: (x', y', z, w, r, g, b, a, s, t)
             if not self.__hyp_enabled:
                 point = np.array([
                     (pos[0]/pos[3] + 1)*self.__width*fsaa_level/2,
@@ -152,7 +171,9 @@ class KeywordHandler:
                     color[0],
                     color[1],
                     color[2],
-                    color[3]
+                    color[3],
+                    s,
+                    t
                 ])
             else:
                 point = np.array([
@@ -163,7 +184,9 @@ class KeywordHandler:
                     color[0]/pos[3],
                     color[1]/pos[3],
                     color[2]/pos[3],
-                    color[3]/pos[3]
+                    color[3]/pos[3],
+                    s/pos[3],
+                    t/pos[3]
                 ])
             points.append(point)
         return points
@@ -176,13 +199,55 @@ class KeywordHandler:
                          int(self.__gamma(point[5]/point[3])*255),\
                          int(self.__gamma(point[6]/point[3])*255),\
                          int(point[7]/point[3]*255)
+            if self.__texture_enabled:
+                s = int((point[8]/point[3])%1.0*self.__tex_img.width)
+                t = int((point[9]/point[3])%1.0*self.__tex_img.height)
+                texel = self.__tex_img.getpixel((s, t))
+                if len(texel) == 3:
+                    r_t, g_t, b_t = texel
+                    a_t = 255
+                else:
+                    r_t, g_t, b_t, a_t = texel
+                if self.__decals_enabled:
+                    # use linear space pixel color
+                    r, g, b, a = int(point[4]/point[3]*255),\
+                         int(point[5]/point[3]*255),\
+                         int(point[6]/point[3]*255),\
+                         int(point[7]/point[3]*255)
+                    
+                    # convert texel color to linear space
+                    r_t = self.__sRGB_to_linear(r_t/255) * 255
+                    g_t = self.__sRGB_to_linear(g_t/255) * 255
+                    b_t = self.__sRGB_to_linear(b_t/255) * 255
+
+                    # blend in linear space
+                    a_prime = a_t + a*(1-a_t/255)
+                    r_t = a_t/a_prime * r_t + (1-a_t/255)*a/a_prime * r
+                    g_t = a_t/a_prime * g_t + (1-a_t/255)*a/a_prime * g
+                    b_t = a_t/a_prime * b_t + (1-a_t/255)*a/a_prime * b
+                    a_t = int(a_prime)
+
+                    # convert to sRGB
+                    r_t = int(self.__sRGB_gamma(r_t/255) * 255)
+                    g_t = int(self.__sRGB_gamma(g_t/255) * 255)
+                    b_t = int(self.__sRGB_gamma(b_t/255) * 255)
+                r, g, b, a = r_t, g_t, b_t, a_t
             if self.__alpha_enabled:
                 r_old, g_old, b_old, a_old = self.__img.getpixel((x, y))
+                r_old = self.__sRGB_to_linear(r_old/255) * 255
+                g_old = self.__sRGB_to_linear(g_old/255) * 255
+                b_old = self.__sRGB_to_linear(b_old/255) * 255
+                r = self.__sRGB_to_linear(r/255) * 255
+                g = self.__sRGB_to_linear(g/255) * 255
+                b = self.__sRGB_to_linear(b/255) * 255
                 a_prime = a + a_old*(1-a/255)
-                r = int(a/a_prime * r + (1-a/255)*a_old/a_prime * r_old)
-                g = int(a/a_prime * g + (1-a/255)*a_old/a_prime * g_old)
-                b = int(a/a_prime * b + (1-a/255)*a_old/a_prime * b_old)
+                r = a/a_prime * r + (1-a/255)*a_old/a_prime * r_old
+                g = a/a_prime * g + (1-a/255)*a_old/a_prime * g_old
+                b = a/a_prime * b + (1-a/255)*a_old/a_prime * b_old
                 a = int(a_prime)
+                r = int(self.__sRGB_gamma(r/255) * 255)
+                g = int(self.__sRGB_gamma(g/255) * 255)
+                b = int(self.__sRGB_gamma(b/255) * 255)
             if x < self.__width*fsaa_level and y < self.__height*fsaa_level:
                 if self.__depth_enabled:
                     if point[2] < self.__depth_buf[y][x]:
@@ -203,9 +268,26 @@ class KeywordHandler:
                     rgba = np.zeros(4)
                     for i in range(self.__fsaa_level):
                         for j in range(self.__fsaa_level):
-                            rgba += self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j]
-                    rgba /= self.__fsaa_level**2
-                    r, g, b, a = int(rgba[0]), int(rgba[1]), int(rgba[2]), int(rgba[3])
+                            step = np.array([
+                                self.__sRGB_to_linear(self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][0]/255),
+                                self.__sRGB_to_linear(self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][1]/255),
+                                self.__sRGB_to_linear(self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][2]/255),
+                                self.__fsaa_buf[y*self.__fsaa_level+i][x*self.__fsaa_level+j][3]/255
+                            ])
+                            step[0] *= step[3]
+                            step[1] *= step[3]
+                            step[2] *= step[3]
+                            rgba += step
+                    if rgba[3] == 0.0:
+                        continue
+                    rgba[0] /= rgba[3]
+                    rgba[1] /= rgba[3]
+                    rgba[2] /= rgba[3]
+                    rgba[3] /= self.__fsaa_level**2
+                    r = round(self.__sRGB_gamma(rgba[0]) * 255)
+                    g = round(self.__sRGB_gamma(rgba[1]) * 255)
+                    b = round(self.__sRGB_gamma(rgba[2]) * 255)
+                    a = round(rgba[3] * 255)
                     self.__img.putpixel((x, y), (r, g, b, a))
 
     def __scanline(self, pp, q, r):
@@ -301,3 +383,9 @@ class KeywordHandler:
             return l_display*12.92
         else:
             return 1.055*(l_display)**(1/2.4) - 0.055
+        
+    def __sRGB_to_linear(self, l_storage):
+        if l_storage <= 0.04045:
+            return l_storage/12.92
+        else:
+            return ((l_storage+0.055)/1.055)**2.4
