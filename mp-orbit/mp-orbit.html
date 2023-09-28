@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <title>MP Orbit (shihuac2)</title>
     <!-- part of a multi-part demonstration: see cs418.cs.illinois.edu -->
-    <script src="wrapWebGL2.js"></script>
     <script src="math.js"></script>
 
 
@@ -252,7 +251,7 @@ function draw(seconds) {
     // Deimos
     let m6 = m4mul(m4trans(4.0*Math.sin(seconds/1.9), 0, 2.4*Math.cos(seconds/1.9)), // Mars' translation
                    m4trans(0.5*Math.sin(6*seconds), 0, 0.5*Math.cos(6*seconds)), // Deimos orbit
-                   m4rotY(6*seconds), // Phobos rotation
+                   m4rotY(6*seconds), // Deimos rotation
                    m4scale(0.03, 0.03, 0.03))
                    gl.uniformMatrix4fv(program.uniforms.mv, false, m4mul(v,m6))
     gl.drawElements(geom.mode, geom.count, geom.type, 0)
