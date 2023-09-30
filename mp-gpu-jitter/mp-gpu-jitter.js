@@ -108,6 +108,8 @@ function draw(milliseconds) {
     // Pass the transformation matrix to the vertex shader
     gl.uniformMatrix4fv(program.uniforms.uniMat, false, uniMat);
 
+    gl.uniform1f(program.uniforms.seconds, milliseconds/1000.0);
+
     gl.bindVertexArray(geom.vao);
     gl.drawElements(geom.mode, geom.count, geom.type, 0);
 }
