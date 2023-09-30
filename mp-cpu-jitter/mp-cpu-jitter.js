@@ -92,10 +92,6 @@ function draw(milliseconds) {
     for (let i = 0; i < window.currentVertices.length; i++) {
         window.currentVertices[i] += (Math.random() - 0.5) * jitterAmount; 
     }
-    
-    // Update the dynamic buffer with the jittered vertex positions
-    gl.bindBuffer(gl.ARRAY_BUFFER, window.dynamicBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, window.currentVertices, gl.DYNAMIC_DRAW);
 
     // Zoom
     let scaledCos = 1.0 - (0.5 * Math.cos(t * 2.5) + 0.5) * (0.5 * Math.cos(t * 2.5) + 0.5);
@@ -122,6 +118,11 @@ function draw(milliseconds) {
     gl.uniformMatrix4fv(program.uniforms.uniMat, false, uniMat);
 
     gl.bindVertexArray(geom.vao);
+
+    // Update the dynamic buffer with the jittered vertex positions
+    gl.bindBuffer(gl.ARRAY_BUFFER, window.dynamicBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, window.currentVertices, gl.DYNAMIC_DRAW);
+    
     gl.drawElements(geom.mode, geom.count, geom.type, 0);
 }
 
