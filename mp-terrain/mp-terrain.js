@@ -65,7 +65,7 @@ function generateModel() {
 
             // Adding two triangles for each grid cell
             geom.triangles.push([vertexIndex, vertexIndex + 1, nextRowVertexIndex]);
-            geom.triangles.push([vertexIndex + 1, nextRowVertexIndex, nextRowVertexIndex + 1]);
+            geom.triangles.push([vertexIndex + 1, nextRowVertexIndex + 1, nextRowVertexIndex]);
 
             // Calculating normalized coordinates and adding them to the attributes
             const normalizedX = (i / (gridsize - 1)) * 2 - 1;
@@ -138,7 +138,6 @@ function supplyDataBuffer(data, loc, mode) {
  *  - vao = the vertex array object for use with gl.bindVertexArray
  */
 function setupGeomery(geom) {
-    console.log(geom)
     var triangleArray = gl.createVertexArray()
     gl.bindVertexArray(triangleArray)
 
@@ -171,14 +170,15 @@ function draw(seconds) {
 
     gl.bindVertexArray(geom.vao)
 
-    gl.uniform4fv(program.uniforms.color, [189/255, 177/255, 120/255, 1])
+    gl.uniform4fv(program.uniforms.color, [200/255, 180/255, 120/255, 1])
 
     let m = IdentityMatrix
-    let cameraPos = [1.5*Math.cos(0.25*seconds), 1.1, 1.5*Math.sin(0.25*seconds)]
+    let cameraPos = [1.5*Math.cos(0.4*seconds), 1.1, 1.5*Math.sin(0.4*seconds)]
     let v = m4view(cameraPos, [0,0,0], [0,1,0])
 
-    let ld = normalize([0.5,-1,0.5])
-    let h = normalize(sub(normalize(mul(cameraPos, -1)), ld))
+    let ld = normalize([0.6, 1, 0.6]);
+    let viewDir = normalize(cameraPos);
+    let h = normalize(add(ld, viewDir));
 
     gl.uniform3fv(program.uniforms.lightdir, ld)
     gl.uniform3fv(program.uniforms.lightcolor, [1,1,1])
@@ -212,9 +212,14 @@ function fillScreen() {
     canvas.style.width = ''
     canvas.style.height = ''
     gl.viewport(0,0, canvas.width, canvas.height)
-    window.p = m4perspNegZ(0.1, 12, 1.25, canvas.width, canvas.height);
+    window.p = m4perspNegZ(0.1, 12.5, 1.25, canvas.width, canvas.height);
 }
 
+/**
+ * Add grid-based normals to geometry.
+ * 
+ * @param {Geometry returned by SetupGeometry()} geom 
+ */
 function addNormals(geom) {
     let ni = geom.attributes.length
     geom.attributes.push([])
@@ -240,6 +245,8 @@ function addNormals(geom) {
 /**
  * Generate grid according to given gridsize.
  * Then, apply faults to the grid.
+ * @param {number of faults to be applied} faults 
+ * @param {size of the grid, should be within 2-255} gridsize 
  */
 function generateGrid(gridsize, faults) {
     // Generate grid initialized to 0 (flat terrain)
@@ -269,11 +276,16 @@ function generateGrid(gridsize, faults) {
             for (let j = 0; j < gridsize; j++) {
                 const bx = i - px;
                 const by = j - py;
+                const distance = Math.sqrt(bx**2 + by**2);
+                
+                const scale = distance !== 0 ? (5.0 / (4.0 + distance)) : 1; 
+
                 const dotProduct = bx * nx + by * ny;
 
                 // If b is in the negative half-space, lower the z coordinate of b by some amount delta
                 // If b is in the positive half-space, raise the z coordinate of b by some amount delta
-                window.grid[i][j] += dotProduct >= 0 ? delta : -delta;
+                const dynamicDelta = delta * scale;
+                window.grid[i][j] += dotProduct >= 0 ? dynamicDelta : -dynamicDelta;
             }
         }
     }
@@ -299,7 +311,6 @@ function generateGrid(gridsize, faults) {
     let model = generateModel()
     addNormals(model)
     window.geom = setupGeomery(model)
-    console.log(geom)
 }
 
 // load shaders and model and start animation at load event
@@ -324,7 +335,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     document.querySelector('#submit').addEventListener('click', event => {
         const gridsize = Number(document.querySelector('#gridsize').value) || 2;
         const faults = Number(document.querySelector('#faults').value) || 0;
-        // TO DO: generate a new gridsize-by-gridsize grid here, then apply faults to it
         generateGrid(gridsize, faults);
     });
 });

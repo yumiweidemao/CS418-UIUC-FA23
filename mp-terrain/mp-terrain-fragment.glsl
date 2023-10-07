@@ -11,10 +11,10 @@ in vec3 vnormal;
 void main() {
     vec3 n = normalize(vnormal);
     float lambert = max(dot(n, lightdir), 0.0);
-    float blinn = pow(max(dot(n, halfway), 0.0), 150.0);
+    float blinn = pow(max(dot(n, halfway), 0.0), 100.0);
     fragColor = vec4(
         color.rgb * (lightcolor * lambert)
         +
-        (lightcolor * blinn) * 2.0
+        (lightcolor * blinn)
     , color.a);
 }
