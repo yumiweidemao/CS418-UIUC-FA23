@@ -1,3 +1,5 @@
+const IdentityMatrix = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])
+
 /**
  * Compiles vertex and fragment shaders, and links them into a program.
  * @param {string} vs_source The source code of the vertex shader.
@@ -43,22 +45,106 @@ function compileShader(vs_source, fs_source) {
 }
 
 /**
- * Sets up geometry data for rendering.
- * @param {object} geom An object containing geometry attributes and triangles.
- * @return {object} An object containing rendering-related properties.
+ * Generate a model in JSON format using window.grid.
+ * 
+ * @returns model of the terrain in JSON format
  */
-function setupGeometry(geom) {
+function generateModel() {
+    if (window.grid == null) return;
+
+    const gridsize = grid.length;
+    const geom = {
+        triangles: [],
+        attributes: [[]]
+    };
+
+    for (let i = 0; i < gridsize - 1; i++) {
+        for (let j = 0; j < gridsize - 1; j++) {
+            const vertexIndex = i * gridsize + j;
+            const nextRowVertexIndex = (i + 1) * gridsize + j;
+
+            // Adding two triangles for each grid cell
+            geom.triangles.push([vertexIndex, vertexIndex + 1, nextRowVertexIndex]);
+            geom.triangles.push([vertexIndex + 1, nextRowVertexIndex, nextRowVertexIndex + 1]);
+
+            // Calculating normalized coordinates and adding them to the attributes
+            const normalizedX = (i / (gridsize - 1)) * 2 - 1;
+            const normalizedZ = (j / (gridsize - 1)) * 2 - 1;
+            const normalizedY = grid[i][j];
+
+            // Adding the current vertex to the attributes
+            geom.attributes[0].push([normalizedX, normalizedY, normalizedZ]);
+        }
+
+        // Adding the last vertex of the current row to the attributes
+        const normalizedX = (i / (gridsize - 1)) * 2 - 1;
+        const normalizedZ = 1;
+        const normalizedY = grid[i][gridsize - 1];
+        geom.attributes[0].push([normalizedX, normalizedY, normalizedZ]);
+    }
+
+    // Adding the last row of vertices to the attributes
+    for (let j = 0; j < gridsize; j++) {
+        const normalizedX = 1;
+        const normalizedZ = (j / (gridsize - 1)) * 2 - 1;
+        const normalizedY = grid[gridsize - 1][j];
+        geom.attributes[0].push([normalizedX, normalizedY, normalizedZ]);
+    }
+
+    return geom;
+}
+
+/**
+ * Sends per-vertex data to the GPU and connects it to a VS input
+ * 
+ * @param data    a 2D array of per-vertex data (e.g. [[x,y,z,w],[x,y,z,w],...])
+ * @param loc     the layout location of the vertex shader's `in` attribute
+ * @param mode    (optional) gl.STATIC_DRAW, gl.DYNAMIC_DRAW, etc
+ * 
+ * @returns the ID of the buffer in GPU memory; useful for changing data later
+ */
+function supplyDataBuffer(data, loc, mode) {
+    if (mode === undefined) mode = gl.STATIC_DRAW
+    
+    const buf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    const f32 = new Float32Array(data.flat())
+    gl.bufferData(gl.ARRAY_BUFFER, f32, mode)
+    
+    gl.vertexAttribPointer(loc, data[0].length, gl.FLOAT, false, 0, 0)
+    gl.enableVertexAttribArray(loc)
+    
+    return buf;
+}
+
+/**
+ * Creates a Vertex Array Object and puts into it all of the data in the given
+ * JSON structure, which should have the following form:
+ * 
+ * ````
+ * {"triangles": a list of of indices of vertices
+ * ,"attributes":
+ *  [ a list of 1-, 2-, 3-, or 4-vectors, one per vertex to go in location 0
+ *  , a list of 1-, 2-, 3-, or 4-vectors, one per vertex to go in location 1
+ *  , ...
+ *  ]
+ * }
+ * ````
+ * 
+ * @returns an object with four keys:
+ *  - mode = the 1st argument for gl.drawElements
+ *  - count = the 2nd argument for gl.drawElements
+ *  - type = the 3rd argument for gl.drawElements
+ *  - vao = the vertex array object for use with gl.bindVertexArray
+ */
+function setupGeomery(geom) {
+    console.log(geom)
     var triangleArray = gl.createVertexArray()
     gl.bindVertexArray(triangleArray)
 
     for(let i=0; i<geom.attributes.length; i+=1) {
-        let buf = gl.createBuffer()
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf)
-        let f32 = new Float32Array(geom.attributes[i].flat())
-        gl.bufferData(gl.ARRAY_BUFFER, f32, gl.STATIC_DRAW)
-        
-        gl.vertexAttribPointer(i, geom.attributes[i][0].length, gl.FLOAT, false, 0, 0)
-        gl.enableVertexAttribArray(i)
+        let data = geom.attributes[i]
+        supplyDataBuffer(data, i)
     }
 
     var indices = new Uint16Array(geom.triangles.flat())
@@ -74,46 +160,34 @@ function setupGeometry(geom) {
     }
 }
 
-/**
- * Renders the scene based on the given time.
- * @param {number} milliseconds The elapsed time in milliseconds.
- */
-function draw(milliseconds) {
+/** Draw one frame */
+function draw(seconds) {
     if (window.grid == null) {
         return;
     }
 
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(program);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.useProgram(program)
+
+    gl.bindVertexArray(geom.vao)
+
+    gl.uniform4fv(program.uniforms.color, [189/255, 177/255, 120/255, 1])
+
+    let m = IdentityMatrix
+    let cameraPos = [1.5*Math.cos(0.25*seconds), 1.1, 1.5*Math.sin(0.25*seconds)]
+    let v = m4view(cameraPos, [0,0,0], [0,1,0])
+
+    let ld = normalize([0.5,-1,0.5])
+    let h = normalize(sub(normalize(mul(cameraPos, -1)), ld))
+
+    gl.uniform3fv(program.uniforms.lightdir, ld)
+    gl.uniform3fv(program.uniforms.lightcolor, [1,1,1])
+    gl.uniform3fv(program.uniforms.halfway, h)
+
+    gl.uniformMatrix4fv(program.uniforms.mv, false, m4mul(v,m))
+    gl.uniformMatrix4fv(program.uniforms.p, false, p)
     
-    let t = milliseconds / 1000.0;
-
-    // Zoom
-    let scaledCos = 1.0 - (0.5 * Math.cos(t * 2.5) + 0.5) * (0.5 * Math.cos(t * 2.5) + 0.5);
-    let zoomFactor = 0.7*(0.3 * scaledCos + 0.4);
-    
-    let scaleMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.scale(scaleMatrix, scaleMatrix, [zoomFactor, zoomFactor, 1.0]);
-
-    // Rotate
-    let rotationMatrix = glMatrix.mat4.create();
-    glMatrix.mat4.rotate(rotationMatrix, rotationMatrix, 0.5 * t, [0, 0, 1]);
-
-    // Translate
-    let translationMatrix = glMatrix.mat4.create();
-    let translation = [0.3 * Math.sin(1.2 * t), 0.3 * Math.cos(1.2 * t), 0];
-    glMatrix.mat4.translate(translationMatrix, translationMatrix, translation);
-
-    // Combine transformations
-    let uniMat = glMatrix.mat4.create();
-    glMatrix.mat4.multiply(uniMat, translationMatrix, rotationMatrix);
-    glMatrix.mat4.multiply(uniMat, uniMat, scaleMatrix);
-
-    // Pass the transformation matrix to the vertex shader
-    gl.uniformMatrix4fv(program.uniforms.uniMat, false, uniMat);
-
-    gl.bindVertexArray(geom.vao);
-    gl.drawElements(geom.mode, geom.count, geom.type, 0);
+    gl.drawElements(geom.mode, geom.count, geom.type, 0)
 }
 
 /**
@@ -121,7 +195,7 @@ function draw(milliseconds) {
  * @param {number} milliseconds The elapsed time in milliseconds.
  */
 function tick(milliseconds) {
-    draw(milliseconds)
+    draw(milliseconds/1000)
     requestAnimationFrame(tick) // asks browser to call tick before next frame
 }
 
@@ -131,15 +205,36 @@ function tick(milliseconds) {
 function fillScreen() {
     let canvas = document.querySelector('canvas')
     document.body.style.margin = '0'
-    canvas.style.width = '100%'
-    canvas.style.height = '100%'
+    canvas.style.width = '100vw'
+    canvas.style.height = '100vh'
     canvas.width = canvas.clientWidth
     canvas.height = canvas.clientHeight
     canvas.style.width = ''
     canvas.style.height = ''
     gl.viewport(0,0, canvas.width, canvas.height)
-    // TO DO: compute a new projection matrix based on the width/height aspect ratio
-    window.p = m4perspNegZ(0.1, 10, 1.5, canvas.width, canvas.height)
+    window.p = m4perspNegZ(0.1, 12, 1.25, canvas.width, canvas.height);
+}
+
+function addNormals(geom) {
+    let ni = geom.attributes.length
+    geom.attributes.push([])
+    for(let i = 0; i < geom.attributes[0].length; i+=1) {
+        geom.attributes[ni].push([0,0,0])
+    }
+    for(let i = 0; i < geom.triangles.length; i+=1) {
+        let p0 = geom.attributes[0][geom.triangles[i][0]]
+        let p1 = geom.attributes[0][geom.triangles[i][1]]
+        let p2 = geom.attributes[0][geom.triangles[i][2]]
+        let e1 = sub(p1,p0)
+        let e2 = sub(p2,p0)
+        let n = cross(e1,e2)
+        geom.attributes[ni][geom.triangles[i][0]] = add(geom.attributes[ni][geom.triangles[i][0]], n)
+        geom.attributes[ni][geom.triangles[i][1]] = add(geom.attributes[ni][geom.triangles[i][1]], n)
+        geom.attributes[ni][geom.triangles[i][2]] = add(geom.attributes[ni][geom.triangles[i][2]], n)
+    }
+    for(let i = 0; i < geom.attributes[0].length; i+=1) {
+        geom.attributes[ni][i] = normalize(geom.attributes[ni][i])
+    }
 }
 
 /**
@@ -147,17 +242,64 @@ function fillScreen() {
  * Then, apply faults to the grid.
  */
 function generateGrid(gridsize, faults) {
-    // generate grid initialized to 0 (flat terrain)
-    window.grid = new Array(n);
+    // Generate grid initialized to 0 (flat terrain)
+    window.grid = new Array(gridsize);
     for (let i = 0; i < gridsize; i++) {
-        window.grid[i] = new Array(n).fill(0);
+        window.grid[i] = new Array(gridsize).fill(0);
     }
 
-    // displace the vertices using the faulting method
+    // adjustable parameters
+    const delta = 1;
+    const c = 1;
 
-    // normalize height
+    // Apply faults
+    for (let f = 0; f < faults; f++) {
+        // Generate a random point p in the (x,y) bounds of the grid
+        const px = Math.floor(Math.random() * gridsize);
+        const py = Math.floor(Math.random() * gridsize);
 
-    // compute grid-based normals
+        // Generate a random normal vector n=(cos(t), sin(t), 0) where t is random
+        const t = Math.random() * 2 * Math.PI;
+        const nx = Math.cos(t);
+        const ny = Math.sin(t);
+
+        // For each vertex b, test which side of the plane that vertex falls on by
+        // using the product test (b-p) * n >= 0
+        for (let i = 0; i < gridsize; i++) {
+            for (let j = 0; j < gridsize; j++) {
+                const bx = i - px;
+                const by = j - py;
+                const dotProduct = bx * nx + by * ny;
+
+                // If b is in the negative half-space, lower the z coordinate of b by some amount delta
+                // If b is in the positive half-space, raise the z coordinate of b by some amount delta
+                window.grid[i][j] += dotProduct >= 0 ? delta : -delta;
+            }
+        }
+    }
+
+    // normalize heights
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < gridsize; i++) {
+        for (let j = 0; j < gridsize; j++) {
+            min = Math.min(min, grid[i][j]);
+            max = Math.max(max, grid[i][j]);
+        }
+    }
+
+    if (faults > 0 && max !== min) {
+        for (let i = 0; i < gridsize; i++) {
+            for (let j = 0; j < gridsize; j++) {
+                grid[i][j] = c * (grid[i][j] - 0.5 * (max + min)) / (max - min);
+            }
+        }
+    }
+
+    let model = generateModel()
+    addNormals(model)
+    window.geom = setupGeomery(model)
+    console.log(geom)
 }
 
 // load shaders and model and start animation at load event
@@ -167,14 +309,17 @@ window.addEventListener('load', async (event) => {
     )
     let vs = await fetch('mp-terrain-vertex.glsl').then(res => res.text())
     let fs = await fetch('mp-terrain-fragment.glsl').then(res => res.text())
-    gl.enable(gl.DEPTH_TEST)
     window.program = compileShader(vs,fs)
+    gl.enable(gl.DEPTH_TEST)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     window.grid = null
     fillScreen()
     requestAnimationFrame(tick) // asks browser to call tick before first frame
 })
 
 window.addEventListener('resize',fillScreen)
+
 document.addEventListener('DOMContentLoaded', (event) => {
     document.querySelector('#submit').addEventListener('click', event => {
         const gridsize = Number(document.querySelector('#gridsize').value) || 2;
