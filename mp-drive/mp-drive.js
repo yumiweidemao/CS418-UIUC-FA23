@@ -221,7 +221,6 @@ function draw(seconds) {
     const gridsize = grid.length
     x_grid = (cameraPos[0]+1)/2 * (gridsize-1)
     z_grid = (cameraPos[2]+1)/2 * (gridsize-1)
-    console.log(cameraPos, gridsize, x_grid, z_grid)
     tx = (x_grid - Math.floor(x_grid)) / (Math.ceil(x_grid) - Math.floor(x_grid))
     tz = (z_grid - Math.floor(z_grid)) / (Math.ceil(z_grid) - Math.floor(z_grid))
     y_pos = lerp(tx, 
@@ -233,6 +232,8 @@ function draw(seconds) {
                       [grid[Math.ceil(x_grid)][Math.ceil(z_grid)]]),
     )
     cameraPos[1] = y_pos[0] + 0.4
+
+    gl.uniform3fv(program.uniforms.cameraPosition, cameraPos)
 
     // calculate R, T and view matrix v=RT
     let R = [
@@ -246,12 +247,9 @@ function draw(seconds) {
     let v = m4mul(R, T)
 
     let ld = normalize([0.8, 1, 0.8]);
-    let viewDir = mul(forwardDir, -1);
-    let h = normalize(add(ld, viewDir));
 
     gl.uniform3fv(program.uniforms.lightdir, ld)
     gl.uniform3fv(program.uniforms.lightcolor, [1,1,1])
-    gl.uniform3fv(program.uniforms.halfway, h)
 
     gl.uniformMatrix4fv(program.uniforms.mv, false, m4mul(v,m))
     gl.uniformMatrix4fv(program.uniforms.p, false, p)
@@ -327,8 +325,8 @@ function generateGrid(gridsize, faults) {
     }
 
     // adjustable parameters
-    const delta = 0.5;
-    const c = 0.9;
+    const delta = 0.6;
+    const c = 0.8;
 
     // Apply faults
     for (let f = 0; f < faults; f++) {
@@ -396,7 +394,7 @@ window.addEventListener('load', async (event) => {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     window.grid = null
-    generateGrid(gridsize=40, faults=40)
+    generateGrid(gridsize=50, faults=50)
     window.lastTime = 0
     window.cameraPos = [0, 1, -0.5]
     window.forwardDir = normalize([0, -0.5, 1])
