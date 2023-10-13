@@ -199,7 +199,7 @@ function draw(seconds) {
     }
 
     // handle camera translation
-    const speed = 0.6;
+    const speed = 0.3;
     if (keysBeingPressed['w']) {
         cameraPos = add(cameraPos, mul(forwardDir, t*speed))
     }
@@ -213,6 +213,27 @@ function draw(seconds) {
         cameraPos = add(cameraPos, mul(cameraRightDir, -t*speed))
     }
 
+    // limit camera within grid
+    cameraPos[0] = Math.min(Math.max(-0.999, cameraPos[0]), 0.999)
+    cameraPos[2] = Math.min(Math.max(-0.999, cameraPos[2]), 0.999)
+
+    // make the y-position a little bit above the ground
+    const gridsize = grid.length
+    x_grid = (cameraPos[0]+1)/2 * (gridsize-1)
+    z_grid = (cameraPos[2]+1)/2 * (gridsize-1)
+    console.log(cameraPos, gridsize, x_grid, z_grid)
+    tx = (x_grid - Math.floor(x_grid)) / (Math.ceil(x_grid) - Math.floor(x_grid))
+    tz = (z_grid - Math.floor(z_grid)) / (Math.ceil(z_grid) - Math.floor(z_grid))
+    y_pos = lerp(tx, 
+                 lerp(tz,
+                      [grid[Math.floor(x_grid)][Math.floor(z_grid)]],
+                      [grid[Math.floor(x_grid)][Math.ceil(z_grid)]]),
+                 lerp(tz,
+                      [grid[Math.ceil(x_grid)][Math.floor(z_grid)]],
+                      [grid[Math.ceil(x_grid)][Math.ceil(z_grid)]]),
+    )
+    cameraPos[1] = y_pos[0] + 0.4
+
     // calculate R, T and view matrix v=RT
     let R = [
         cameraRightDir[0], cameraUpDir[0], -forwardDir[0], 0,
@@ -224,7 +245,7 @@ function draw(seconds) {
     let T = m4trans(...mul(cameraPos, -1))
     let v = m4mul(R, T)
 
-    let ld = normalize([0.6, 1, 0.6]);
+    let ld = normalize([0.8, 1, 0.8]);
     let viewDir = mul(forwardDir, -1);
     let h = normalize(add(ld, viewDir));
 
@@ -306,8 +327,8 @@ function generateGrid(gridsize, faults) {
     }
 
     // adjustable parameters
-    const delta = 3;
-    const c = 1;
+    const delta = 0.5;
+    const c = 0.9;
 
     // Apply faults
     for (let f = 0; f < faults; f++) {
@@ -375,10 +396,10 @@ window.addEventListener('load', async (event) => {
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     window.grid = null
-    generateGrid(gridsize=60, faults=100)
+    generateGrid(gridsize=40, faults=40)
     window.lastTime = 0
-    window.cameraPos = [0, 1.05, 1.1]
-    window.forwardDir = normalize(mul(window.cameraPos, -1))
+    window.cameraPos = [0, 1, -0.5]
+    window.forwardDir = normalize([0, -0.5, 1])
     fillScreen()
     requestAnimationFrame(tick) // asks browser to call tick before first frame
 })
